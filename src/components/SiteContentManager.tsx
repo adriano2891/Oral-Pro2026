@@ -32,18 +32,44 @@ import {
 import { useSiteContent } from '../context/SiteContentContext';
 import { SiteContentSlot, CustomSection, CustomSectionImage, MediaLibraryItem } from '../types';
 
-// Client-side image compression utility
+// Client-side resilient image compression utility
 async function compressImageFile(file: File): Promise<{ dataUrl: string; sizeKb: number; width: number; height: number }> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = reject;
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onerror = reject;
-      img.onload = () => {
-        const MAX_WIDTH = 1920;
-        const MAX_HEIGHT = 1080;
-        let { width, height } = img;
+    if (!file) {
+      reject(new Error('Nenhum ficheiro fornecido.'));
+      return;
+    }
+
+    // Try object URL first (fastest, uses virtually zero RAM compared to reading whole file as base64)
+    let objectUrl = '';
+    try {
+      objectUrl = URL.createObjectURL(file);
+    } catch {
+      // Continue to FileReader fallback
+    }
+
+    const img = new Image();
+
+    const cleanup = () => {
+      if (objectUrl) {
+        try {
+          URL.revokeObjectURL(objectUrl);
+        } catch {
+          // Ignore revoke error
+        }
+      }
+    };
+
+    const processImg = (imageElement: HTMLImageElement) => {
+      try {
+        const MAX_WIDTH = 1440;
+        const MAX_HEIGHT = 900;
+        let { width, height } = imageElement;
+
+        if (width <= 0 || height <= 0) {
+          width = 1200;
+          height = 800;
+        }
 
         if (width > MAX_WIDTH || height > MAX_HEIGHT) {
           const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
@@ -55,33 +81,95 @@ async function compressImageFile(file: File): Promise<{ dataUrl: string; sizeKb:
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
+
         if (!ctx) {
-          resolve({ dataUrl: e.target?.result as string, sizeKb: Math.round(file.size / 1024), width: img.width, height: img.height });
+          // If canvas context unavailable, fallback to direct data URL
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            resolve({
+              dataUrl: ev.target?.result as string,
+              sizeKb: Math.round(file.size / 1024),
+              width,
+              height,
+            });
+          };
+          reader.onerror = () => reject(new Error('Erro ao ler dados da imagem.'));
+          reader.readAsDataURL(file);
           return;
         }
 
-        // Draw image naturally without any filters or distortions to respect clinical treatment reality
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(img, 0, 0, width, height);
+        ctx.drawImage(imageElement, 0, 0, width, height);
 
-        // Export as WebP if supported, fallback to JPEG
         let dataUrl = '';
         try {
-          dataUrl = canvas.toDataURL('image/webp', 0.88);
-          if (!dataUrl.startsWith('data:image/webp')) {
-            dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+          dataUrl = canvas.toDataURL('image/webp', 0.82);
+          if (!dataUrl || !dataUrl.startsWith('data:image/webp') || dataUrl.length < 50) {
+            dataUrl = canvas.toDataURL('image/jpeg', 0.82);
           }
         } catch {
-          dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+          try {
+            dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+          } catch {
+            // Direct FileReader fallback
+          }
         }
 
-        const approxSizeKb = Math.round((dataUrl.length * 3) / 4 / 1024);
-        resolve({ dataUrl, sizeKb: approxSizeKb, width, height });
-      };
-      img.src = e.target?.result as string;
+        if (dataUrl && dataUrl.length > 50) {
+          const approxSizeKb = Math.round((dataUrl.length * 3) / 4 / 1024);
+          resolve({ dataUrl, sizeKb: approxSizeKb, width, height });
+        } else {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            resolve({
+              dataUrl: ev.target?.result as string,
+              sizeKb: Math.round(file.size / 1024),
+              width,
+              height,
+            });
+          };
+          reader.onerror = () => reject(new Error('Falha ao processar ficheiro de imagem.'));
+          reader.readAsDataURL(file);
+        }
+      } catch (err: any) {
+        reject(new Error(`Falha no processamento: ${err?.message || 'Formato não reconhecido'}`));
+      }
     };
-    reader.readAsDataURL(file);
+
+    img.onload = () => {
+      cleanup();
+      processImg(img);
+    };
+
+    img.onerror = () => {
+      cleanup();
+      // Attempt FileReader fallback
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Não foi possível ler o ficheiro. Certifique-se de que é JPG, PNG ou WebP.'));
+      reader.onload = (e) => {
+        const fallbackImg = new Image();
+        fallbackImg.onload = () => {
+          processImg(fallbackImg);
+        };
+        fallbackImg.onerror = () => {
+          reject(new Error('O formato da imagem não é suportado pelo navegador. Por favor envie um ficheiro JPG, PNG ou WebP.'));
+        };
+        fallbackImg.src = e.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    };
+
+    if (objectUrl) {
+      img.src = objectUrl;
+    } else {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Erro ao aceder ao ficheiro.'));
+      reader.onload = (e) => {
+        img.src = e.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    }
   });
 }
 
@@ -166,9 +254,10 @@ export const SiteContentManager: React.FC<SiteContentManagerProps> = ({
   } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // Hidden File input ref
+  // Hidden File input refs
   const fileInputRef = useRef<HTMLInputElement>(null);
   const customSectionFileInputRef = useRef<HTMLInputElement>(null);
+  const uploadTargetSlotRef = useRef<SiteContentSlot | null>(null);
 
   const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
     setStatusNotice({ type, message });
@@ -235,17 +324,23 @@ export const SiteContentManager: React.FC<SiteContentManagerProps> = ({
   const handleRemoveImageFromSlot = async (slot: SiteContentSlot) => {
     if (confirm(`Pretende remover a fotografia do campo "${slot.pageLabel} > ${slot.sectionLabel}"?`)) {
       await updateSlot(slot.key, { draftImageUrl: '' });
+      setBrokenImages((prev) => ({ ...prev, [slot.key]: false }));
       showNotification('info', `Fotografia removida em rascunho do campo "${slot.sectionLabel}".`);
     }
   };
 
-  // 6. Handle local file upload with compression
+  // 6. Handle local file upload with compression and zero-loss association
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, targetSlot?: SiteContentSlot) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
+    const activeSlot = uploadTargetSlotRef.current || targetSlot || selectedSlotForImage;
+
+    // Validate mime-type loosely (support common images and device formats)
+    if (file.type && !file.type.startsWith('image/')) {
       showNotification('error', 'Formato inválido. Por favor envie um ficheiro JPG, PNG, WebP ou GIF.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      uploadTargetSlotRef.current = null;
       return;
     }
 
@@ -254,18 +349,19 @@ export const SiteContentManager: React.FC<SiteContentManagerProps> = ({
       const { dataUrl, sizeKb } = await compressImageFile(file);
 
       // Add to media library
-      const uploadedItem = await uploadMedia({
+      await uploadMedia({
         name: file.name.replace(/\.[^/.]+$/, ''),
         url: dataUrl,
-        category: targetSlot ? targetSlot.pageLabel : 'Geral',
+        category: activeSlot ? activeSlot.pageLabel : 'Geral',
         size: `${sizeKb} KB (Otimizado HD)`,
         aspectRatio: '16:9',
         origin: 'Carregamento do Computador',
       });
 
-      if (targetSlot) {
-        await updateSlot(targetSlot.key, { draftImageUrl: dataUrl });
-        showNotification('success', `Fotografia associada a "${targetSlot.pageLabel} > ${targetSlot.sectionLabel}" com sucesso!`);
+      if (activeSlot) {
+        await updateSlot(activeSlot.key, { draftImageUrl: dataUrl });
+        setBrokenImages((prev) => ({ ...prev, [activeSlot.key]: false }));
+        showNotification('success', `Fotografia associada a "${activeSlot.pageLabel} > ${activeSlot.sectionLabel}" com sucesso!`);
         setSelectedSlotForImage(null);
       } else {
         showNotification('success', `Fotografia "${file.name}" comprimida e adicionada à Biblioteca!`);
@@ -274,6 +370,7 @@ export const SiteContentManager: React.FC<SiteContentManagerProps> = ({
       showNotification('error', `Falha ao processar ficheiro: ${err.message || 'Erro desconhecido'}`);
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = '';
+      uploadTargetSlotRef.current = null;
     }
   };
 
@@ -737,7 +834,6 @@ export const SiteContentManager: React.FC<SiteContentManagerProps> = ({
                             alt={currentAlt || slot.sectionLabel}
                             onError={() => {
                               setBrokenImages((prev) => ({ ...prev, [slot.key]: true }));
-                              showNotification('error', `Atenção: A imagem do campo "${slot.sectionLabel}" não pôde ser carregada. Verifique o URL.`);
                             }}
                             className={`w-full h-full ${
                               currentFit === 'contain' ? 'object-contain' : 'object-cover'
@@ -1614,8 +1710,12 @@ export const SiteContentManager: React.FC<SiteContentManagerProps> = ({
                 </p>
               </div>
               <button
-                onClick={() => fileInputRef.current?.click()}
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shrink-0 cursor-pointer shadow-sm"
+                type="button"
+                onClick={() => {
+                  uploadTargetSlotRef.current = selectedSlotForImage;
+                  fileInputRef.current?.click();
+                }}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shrink-0 cursor-pointer shadow-sm transition-all active:scale-[0.98]"
               >
                 Escolher Ficheiro
               </button>
@@ -1638,12 +1738,16 @@ export const SiteContentManager: React.FC<SiteContentManagerProps> = ({
                   onClick={async () => {
                     const el = document.getElementById('slot-direct-url-input') as HTMLInputElement;
                     if (el && el.value.trim()) {
-                      await updateSlot(selectedSlotForImage.key, { draftImageUrl: el.value.trim() });
+                      const url = el.value.trim();
+                      await updateSlot(selectedSlotForImage.key, { draftImageUrl: url });
+                      setBrokenImages((prev) => ({ ...prev, [selectedSlotForImage.key]: false }));
                       showNotification('success', 'Imagem associada em rascunho com sucesso!');
                       setSelectedSlotForImage(null);
+                    } else {
+                      showNotification('error', 'Por favor indique um URL válido.');
                     }
                   }}
-                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold cursor-pointer"
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold cursor-pointer transition-colors"
                 >
                   Aplicar
                 </button>
@@ -1660,26 +1764,27 @@ export const SiteContentManager: React.FC<SiteContentManagerProps> = ({
                   <div
                     key={item.id}
                     onClick={async () => {
-                      if (
-                        confirm(
-                          `Pretende associar a imagem "${item.name}" ao campo "${selectedSlotForImage.pageLabel} > ${selectedSlotForImage.sectionLabel}"?`
-                        )
-                      ) {
-                        await updateSlot(selectedSlotForImage.key, { draftImageUrl: item.url });
-                        showNotification('success', `Imagem "${item.name}" associada com sucesso!`);
-                        setSelectedSlotForImage(null);
-                      }
+                      await updateSlot(selectedSlotForImage.key, { draftImageUrl: item.url });
+                      setBrokenImages((prev) => ({ ...prev, [selectedSlotForImage.key]: false }));
+                      showNotification('success', `Imagem "${item.name}" associada com sucesso!`);
+                      setSelectedSlotForImage(null);
                     }}
-                    className="border border-slate-200 rounded-xl overflow-hidden hover:border-blue-600 cursor-pointer group"
+                    className="border border-slate-200 rounded-xl overflow-hidden hover:border-blue-600 hover:shadow-md cursor-pointer group transition-all"
                   >
-                    <div className="aspect-[16/10] bg-slate-100 overflow-hidden">
+                    <div className="aspect-[16/10] bg-slate-100 overflow-hidden relative">
                       <img
                         src={item.url}
                         alt={item.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        loading="lazy"
                       />
+                      <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/15 transition-colors flex items-center justify-center">
+                        <span className="opacity-0 group-hover:opacity-100 bg-white/95 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded shadow-xs transition-opacity">
+                          Selecionar
+                        </span>
+                      </div>
                     </div>
-                    <div className="p-2 text-[10px] font-semibold text-slate-700 line-clamp-1">
+                    <div className="p-2 text-[10px] font-semibold text-slate-700 line-clamp-1 group-hover:text-blue-600">
                       {item.name}
                     </div>
                   </div>

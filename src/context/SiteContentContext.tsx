@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { SiteContentSlot, CustomSection, MediaLibraryItem, AuditLogEntry } from '../types';
 import {
   INITIAL_SLOTS,
@@ -7,6 +7,7 @@ import {
   INITIAL_AUDIT_LOGS,
   INITIAL_LAST_PUBLISHED,
 } from '../data/initialSiteContent';
+import { getIdbCMSData, saveIdbCMSData } from '../utils/idbStorage';
 
 const CMS_STORAGE_KEY = 'oralpro_cms_state_v1';
 
@@ -93,6 +94,35 @@ function recalculateLibraryUsages(
   }));
 }
 
+function parseStoredCMSState(parsed: any) {
+  if (parsed && Array.isArray(parsed.slots) && parsed.slots.length > 0) {
+    const loadedKeys = new Set(parsed.slots.map((s: SiteContentSlot) => s.key));
+    const mergedSlots: SiteContentSlot[] = [
+      ...parsed.slots,
+      ...INITIAL_SLOTS.filter((s) => !loadedKeys.has(s.key)),
+    ];
+    const hasUnpublished =
+      mergedSlots.some((s) => s.hasChanges) ||
+      (parsed.customSections || []).some((c: any) => c.hasChanges);
+
+    const library = recalculateLibraryUsages(
+      mergedSlots,
+      parsed.customSections || INITIAL_CUSTOM_SECTIONS,
+      parsed.mediaLibrary || INITIAL_MEDIA_LIBRARY
+    );
+
+    return {
+      slots: mergedSlots,
+      customSections: parsed.customSections || INITIAL_CUSTOM_SECTIONS,
+      mediaLibrary: library,
+      auditLogs: parsed.auditLogs || INITIAL_AUDIT_LOGS,
+      lastPublished: parsed.lastPublished || INITIAL_LAST_PUBLISHED,
+      hasUnpublished,
+    };
+  }
+  return null;
+}
+
 function loadInitialCMSState(): {
   slots: SiteContentSlot[];
   customSections: CustomSection[];
@@ -106,31 +136,8 @@ function loadInitialCMSState(): {
       const stored = localStorage.getItem(CMS_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed && Array.isArray(parsed.slots) && parsed.slots.length > 0) {
-          const loadedKeys = new Set(parsed.slots.map((s: SiteContentSlot) => s.key));
-          const mergedSlots: SiteContentSlot[] = [
-            ...parsed.slots,
-            ...INITIAL_SLOTS.filter((s) => !loadedKeys.has(s.key)),
-          ];
-          const hasUnpublished =
-            mergedSlots.some((s) => s.hasChanges) ||
-            (parsed.customSections || []).some((c: any) => c.hasChanges);
-
-          const library = recalculateLibraryUsages(
-            mergedSlots,
-            parsed.customSections || INITIAL_CUSTOM_SECTIONS,
-            parsed.mediaLibrary || INITIAL_MEDIA_LIBRARY
-          );
-
-          return {
-            slots: mergedSlots,
-            customSections: parsed.customSections || INITIAL_CUSTOM_SECTIONS,
-            mediaLibrary: library,
-            auditLogs: parsed.auditLogs || INITIAL_AUDIT_LOGS,
-            lastPublished: parsed.lastPublished || INITIAL_LAST_PUBLISHED,
-            hasUnpublished,
-          };
-        }
+        const validated = parseStoredCMSState(parsed);
+        if (validated) return validated;
       }
     } catch (err) {
       console.warn('Error reading stored CMS state from localStorage:', err);
@@ -153,18 +160,36 @@ function loadInitialCMSState(): {
   };
 }
 
-function persistStateToStorage(data: {
+async function persistState(data: {
   slots: SiteContentSlot[];
   customSections: CustomSection[];
   mediaLibrary: MediaLibraryItem[];
   auditLogs: AuditLogEntry[];
   lastPublished: string;
 }) {
+  // 1. Always save full state into IndexedDB (virtually unlimited quota, handles HD images easily)
+  await saveIdbCMSData(data);
+
+  // 2. Try saving to localStorage as backup (strip large data URLs if quota exceeded)
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(CMS_STORAGE_KEY, JSON.stringify(data));
-    } catch (err) {
-      console.warn('Unable to persist CMS state to localStorage:', err);
+    } catch {
+      try {
+        // If quota exceeded, create lightweight version for localStorage
+        const lightweight = {
+          ...data,
+          slots: data.slots.map((s) => ({
+            ...s,
+            // If dataUrl is too large for localStorage, omit it from localStorage backup since it lives in IndexedDB
+            imageUrl: s.imageUrl?.startsWith('data:') && s.imageUrl.length > 50000 ? '' : s.imageUrl,
+            draftImageUrl: s.draftImageUrl?.startsWith('data:') && s.draftImageUrl.length > 50000 ? '' : s.draftImageUrl,
+          })),
+        };
+        localStorage.setItem(CMS_STORAGE_KEY, JSON.stringify(lightweight));
+      } catch (e2) {
+        console.warn('LocalStorage quota notice - full image data safely retained in IndexedDB.', e2);
+      }
     }
   }
 }
@@ -179,7 +204,16 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [hasUnpublished, setHasUnpublished] = useState<boolean>(initialData.hasUnpublished);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Sync to localStorage whenever published state or drafts change
+  // Real-time mutable reference to prevent stale closure overwrites
+  const stateRef = useRef({
+    slots: initialData.slots,
+    customSections: initialData.customSections,
+    mediaLibrary: initialData.mediaLibrary,
+    auditLogs: initialData.auditLogs,
+    lastPublished: initialData.lastPublished,
+  });
+
+  // Sync state to memory, React state, and persistent storage
   const syncState = useCallback(
     (
       newSlots: SiteContentSlot[],
@@ -192,6 +226,15 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const unpublished =
         newSlots.some((s) => s.hasChanges) || newCustomSections.some((c: any) => c.hasChanges);
 
+      // Update stateRef immediately so subsequent calls in the same event loop read current values
+      stateRef.current = {
+        slots: newSlots,
+        customSections: newCustomSections,
+        mediaLibrary: updatedLibrary,
+        auditLogs: newAuditLogs,
+        lastPublished: newLastPublished,
+      };
+
       setSlots(newSlots);
       setCustomSections(newCustomSections);
       setMediaLibrary(updatedLibrary);
@@ -199,7 +242,7 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
       setLastPublished(newLastPublished);
       setHasUnpublished(unpublished);
 
-      persistStateToStorage({
+      persistState({
         slots: newSlots,
         customSections: newCustomSections,
         mediaLibrary: updatedLibrary,
@@ -210,9 +253,36 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
     []
   );
 
+  // Initialize from IndexedDB on mount if available (captures heavy uploads)
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const idbData = await getIdbCMSData();
+        if (idbData && isMounted) {
+          const validated = parseStoredCMSState(idbData);
+          if (validated) {
+            syncState(
+              validated.slots,
+              validated.customSections,
+              validated.mediaLibrary,
+              validated.auditLogs,
+              validated.lastPublished
+            );
+          }
+        }
+      } catch (e) {
+        console.warn('Notice reading IndexedDB CMS:', e);
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, [syncState]);
+
   const refreshContent = useCallback(async () => {
     try {
-      // 1. Try server API endpoint first
+      // 1. Try server API endpoint first (works on dev and backend-enabled hosts)
       const res = await fetch('/api/site-content');
       const contentType = res.headers.get('content-type') || '';
 
@@ -229,18 +299,17 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
             syncState(
               mergedSlots,
-              data.data.customSections || customSections,
-              data.data.mediaLibrary || mediaLibrary,
-              data.data.auditLogs || auditLogs,
-              data.data.lastPublished || lastPublished
+              data.data.customSections || stateRef.current.customSections,
+              data.data.mediaLibrary || stateRef.current.mediaLibrary,
+              data.data.auditLogs || stateRef.current.auditLogs,
+              data.data.lastPublished || stateRef.current.lastPublished
             );
             return;
           }
         }
       }
 
-      // 2. If API is not available (e.g. Netlify static SPA without functions),
-      // try static fallback file if localStorage has no previous edits
+      // 2. Fallback check for static distribution
       if (typeof window !== 'undefined' && !localStorage.getItem(CMS_STORAGE_KEY)) {
         try {
           const staticRes = await fetch('/data/site_content.json');
@@ -266,7 +335,7 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
     } finally {
       setIsLoading(false);
     }
-  }, [syncState, customSections, mediaLibrary, auditLogs, lastPublished]);
+  }, [syncState]);
 
   useEffect(() => {
     refreshContent();
@@ -305,7 +374,8 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
   );
 
   const updateSlot = async (key: string, updates: Partial<SiteContentSlot>): Promise<boolean> => {
-    const updatedSlots = slots.map((slot) => {
+    const currentSlots = stateRef.current.slots;
+    const updatedSlots = currentSlots.map((slot) => {
       if (slot.key !== key) return slot;
 
       const newDraftImageUrl = updates.draftImageUrl !== undefined ? updates.draftImageUrl : slot.draftImageUrl;
@@ -347,9 +417,15 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
       };
     });
 
-    syncState(updatedSlots, customSections, mediaLibrary, auditLogs, lastPublished);
+    syncState(
+      updatedSlots,
+      stateRef.current.customSections,
+      stateRef.current.mediaLibrary,
+      stateRef.current.auditLogs,
+      stateRef.current.lastPublished
+    );
 
-    // Also attempt server sync if backend is active
+    // Optional server sync (does not throw on Netlify static hosting)
     try {
       await fetch('/api/site-content/slot', {
         method: 'POST',
@@ -357,7 +433,7 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
         body: JSON.stringify({ key, updates }),
       });
     } catch {
-      // Local sync succeeded, safe to proceed
+      // Local sync is authoritative
     }
 
     return true;
@@ -372,8 +448,14 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
       timestamp: new Date().toISOString(),
     };
 
-    const newLogs = [newLog, ...auditLogs].slice(0, 50);
-    syncState(slots, customSections, mediaLibrary, newLogs, lastPublished);
+    const newLogs = [newLog, ...stateRef.current.auditLogs].slice(0, 50);
+    syncState(
+      stateRef.current.slots,
+      stateRef.current.customSections,
+      stateRef.current.mediaLibrary,
+      newLogs,
+      stateRef.current.lastPublished
+    );
 
     try {
       await fetch('/api/site-content/save-drafts', {
@@ -389,7 +471,8 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const publishChanges = async (): Promise<boolean> => {
     let changedCount = 0;
-    const publishedSlots = slots.map((slot) => {
+    const currentSlots = stateRef.current.slots;
+    const publishedSlots = currentSlots.map((slot) => {
       if (!slot.hasChanges) return slot;
       changedCount++;
 
@@ -419,7 +502,7 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
       };
     });
 
-    const publishedSections = customSections.map((sec: any) => ({
+    const publishedSections = stateRef.current.customSections.map((sec: any) => ({
       ...sec,
       hasChanges: false,
     }));
@@ -433,8 +516,8 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
       timestamp: now,
     };
 
-    const newLogs = [newLog, ...auditLogs].slice(0, 50);
-    syncState(publishedSlots, publishedSections, mediaLibrary, newLogs, now);
+    const newLogs = [newLog, ...stateRef.current.auditLogs].slice(0, 50);
+    syncState(publishedSlots, publishedSections, stateRef.current.mediaLibrary, newLogs, now);
 
     try {
       await fetch('/api/site-content/publish', {
@@ -449,7 +532,7 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const revertDrafts = async (): Promise<boolean> => {
-    const revertedSlots = slots.map((slot) => ({
+    const revertedSlots = stateRef.current.slots.map((slot) => ({
       ...slot,
       hasChanges: false,
       draftImageUrl: undefined,
@@ -472,8 +555,14 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
       timestamp: new Date().toISOString(),
     };
 
-    const newLogs = [newLog, ...auditLogs].slice(0, 50);
-    syncState(revertedSlots, customSections, mediaLibrary, newLogs, lastPublished);
+    const newLogs = [newLog, ...stateRef.current.auditLogs].slice(0, 50);
+    syncState(
+      revertedSlots,
+      stateRef.current.customSections,
+      stateRef.current.mediaLibrary,
+      newLogs,
+      stateRef.current.lastPublished
+    );
 
     try {
       await fetch('/api/site-content/revert', {
@@ -491,9 +580,10 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
     data: Partial<CustomSection> & { id?: string }
   ): Promise<boolean> => {
     let updatedSections: CustomSection[];
+    const currentSections = stateRef.current.customSections;
 
     if (data.id) {
-      updatedSections = customSections.map((s) =>
+      updatedSections = currentSections.map((s) =>
         s.id === data.id
           ? {
               ...s,
@@ -512,15 +602,21 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
         images: data.images || [],
         buttonText: data.buttonText || '',
         buttonLink: data.buttonLink || '',
-        order: data.order ?? customSections.length + 1,
+        order: data.order ?? currentSections.length + 1,
         status: data.status || 'publicado',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      updatedSections = [...customSections, newSec];
+      updatedSections = [...currentSections, newSec];
     }
 
-    syncState(slots, updatedSections, mediaLibrary, auditLogs, lastPublished);
+    syncState(
+      stateRef.current.slots,
+      updatedSections,
+      stateRef.current.mediaLibrary,
+      stateRef.current.auditLogs,
+      stateRef.current.lastPublished
+    );
 
     try {
       await fetch('/api/site-content/custom-section', {
@@ -536,8 +632,14 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const deleteCustomSection = async (id: string): Promise<boolean> => {
-    const updatedSections = customSections.filter((s) => s.id !== id);
-    syncState(slots, updatedSections, mediaLibrary, auditLogs, lastPublished);
+    const updatedSections = stateRef.current.customSections.filter((s) => s.id !== id);
+    syncState(
+      stateRef.current.slots,
+      updatedSections,
+      stateRef.current.mediaLibrary,
+      stateRef.current.auditLogs,
+      stateRef.current.lastPublished
+    );
 
     try {
       await fetch(`/api/site-content/custom-section/${id}`, {
@@ -571,8 +673,14 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
       usedIn: [],
     };
 
-    const updatedLibrary = [newItem, ...mediaLibrary];
-    syncState(slots, customSections, updatedLibrary, auditLogs, lastPublished);
+    const updatedLibrary = [newItem, ...stateRef.current.mediaLibrary];
+    syncState(
+      stateRef.current.slots,
+      stateRef.current.customSections,
+      updatedLibrary,
+      stateRef.current.auditLogs,
+      stateRef.current.lastPublished
+    );
 
     try {
       await fetch('/api/site-content/media-library', {
@@ -588,8 +696,14 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const deleteMedia = async (id: string): Promise<boolean> => {
-    const updatedLibrary = mediaLibrary.filter((m) => m.id !== id);
-    syncState(slots, customSections, updatedLibrary, auditLogs, lastPublished);
+    const updatedLibrary = stateRef.current.mediaLibrary.filter((m) => m.id !== id);
+    syncState(
+      stateRef.current.slots,
+      stateRef.current.customSections,
+      updatedLibrary,
+      stateRef.current.auditLogs,
+      stateRef.current.lastPublished
+    );
 
     try {
       await fetch(`/api/site-content/media-library/${id}`, {
