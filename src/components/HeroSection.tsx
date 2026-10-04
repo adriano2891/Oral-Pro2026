@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ArrowRight, MessageSquare, CheckCircle2 } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useSiteContent } from '../context/SiteContentContext';
+import { getAspectRatioClass, getImageFitClass, getImagePositionClass } from '../types';
 
 interface HeroSectionProps {
   onOpenBooking: () => void;
@@ -101,19 +102,11 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onOpenBooking, onOpenC
           <div className="lg:col-span-5 space-y-4">
             <div className="relative rounded-2xl bg-white border border-slate-200/90 shadow-lg shadow-slate-100/70 p-5 overflow-hidden">
               {/* Photo Representation with Context */}
-              <div className="relative aspect-[16/10] rounded-xl overflow-hidden bg-slate-900 border border-slate-100 group">
+              <div className={`relative ${getAspectRatioClass(heroSlot.aspectRatio)} rounded-xl overflow-hidden bg-slate-900 border border-slate-100 group`}>
                 <img
                   src={heroSlot.imageUrl}
                   alt={heroSlot.altText}
-                  className={`w-full h-full ${
-                    heroSlot.fit === 'contain' ? 'object-contain' : 'object-cover'
-                  } ${
-                    heroSlot.position === 'top'
-                      ? 'object-top'
-                      : heroSlot.position === 'bottom'
-                      ? 'object-bottom'
-                      : 'object-center'
-                  } transition-transform duration-500 group-hover:scale-105`}
+                  className={`w-full h-full ${getImageFitClass(heroSlot.fit)} ${getImagePositionClass(heroSlot.position)} transition-transform duration-500 group-hover:scale-105`}
                   referrerPolicy="no-referrer"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/30 to-transparent" />

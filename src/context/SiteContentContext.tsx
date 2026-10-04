@@ -291,11 +291,35 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
         if (text && !text.trim().startsWith('<')) {
           const data = JSON.parse(text);
           if (data && data.success && data.data && Array.isArray(data.data.slots)) {
-            const loadedKeys = new Set(data.data.slots.map((s: SiteContentSlot) => s.key));
-            const mergedSlots: SiteContentSlot[] = [
-              ...data.data.slots,
-              ...INITIAL_SLOTS.filter((s) => !loadedKeys.has(s.key)),
-            ];
+            // Merge intelligently: preserve user's local slot adjustments (e.g. aspect ratio, custom photos, fit)
+            const currentSlotsMap = new Map(stateRef.current.slots.map((s) => [s.key, s]));
+            const mergedSlots: SiteContentSlot[] = data.data.slots.map((serverSlot: SiteContentSlot) => {
+              const localSlot = currentSlotsMap.get(serverSlot.key);
+              if (!localSlot) return serverSlot;
+              return {
+                ...serverSlot,
+                aspectRatio: localSlot.aspectRatio || serverSlot.aspectRatio,
+                draftAspectRatio: localSlot.draftAspectRatio,
+                fit: localSlot.fit || serverSlot.fit,
+                draftFit: localSlot.draftFit,
+                position: localSlot.position || serverSlot.position,
+                draftPosition: localSlot.draftPosition,
+                imageUrl: localSlot.imageUrl || serverSlot.imageUrl,
+                draftImageUrl: localSlot.draftImageUrl,
+                altText: localSlot.altText || serverSlot.altText,
+                draftAltText: localSlot.draftAltText,
+                hasChanges: localSlot.hasChanges || false,
+              };
+            });
+
+            // Also include any slots present locally that weren't in server response
+            const serverSlotKeys = new Set(data.data.slots.map((s: SiteContentSlot) => s.key));
+            INITIAL_SLOTS.forEach((s) => {
+              if (!serverSlotKeys.has(s.key)) {
+                const localSlot = currentSlotsMap.get(s.key) || s;
+                mergedSlots.push(localSlot);
+              }
+            });
 
             syncState(
               mergedSlots,
@@ -354,11 +378,11 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
         };
       }
       return {
-        imageUrl: slot.imageUrl || fallbackUrl,
-        altText: slot.altText || fallbackAlt,
-        aspectRatio: slot.aspectRatio || '16:9',
-        fit: slot.fit || 'cover',
-        position: slot.position || 'center',
+        imageUrl: slot.draftImageUrl !== undefined && slot.draftImageUrl !== '' ? slot.draftImageUrl : (slot.imageUrl || fallbackUrl),
+        altText: slot.draftAltText !== undefined ? slot.draftAltText : (slot.altText || fallbackAlt),
+        aspectRatio: slot.draftAspectRatio || slot.aspectRatio || '16:9',
+        fit: slot.draftFit || slot.fit || 'cover',
+        position: slot.draftPosition || slot.position || 'center',
       };
     },
     [slots]
@@ -378,11 +402,48 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const updatedSlots = currentSlots.map((slot) => {
       if (slot.key !== key) return slot;
 
+      // Immediately fix and update both published and draft aspect ratio when changed
+      const newAspect = updates.aspectRatio !== undefined 
+        ? updates.aspectRatio 
+        : updates.draftAspectRatio !== undefined 
+          ? updates.draftAspectRatio 
+          : slot.aspectRatio;
+
+      const newDraftAspect = updates.draftAspectRatio !== undefined 
+        ? updates.draftAspectRatio 
+        : updates.aspectRatio !== undefined 
+          ? updates.aspectRatio 
+          : slot.draftAspectRatio;
+
+      const newFit = updates.fit !== undefined 
+        ? updates.fit 
+        : updates.draftFit !== undefined 
+          ? updates.draftFit 
+          : slot.fit;
+
+      const newDraftFit = updates.draftFit !== undefined 
+        ? updates.draftFit 
+        : updates.fit !== undefined 
+          ? updates.fit 
+          : slot.draftFit;
+
+      const newPosition = updates.position !== undefined 
+        ? updates.position 
+        : updates.draftPosition !== undefined 
+          ? updates.draftPosition 
+          : slot.position;
+
+      const newDraftPosition = updates.draftPosition !== undefined 
+        ? updates.draftPosition 
+        : updates.position !== undefined 
+          ? updates.position 
+          : slot.draftPosition;
+
+      const newImageUrl = updates.imageUrl !== undefined ? updates.imageUrl : slot.imageUrl;
+      const newAltText = updates.altText !== undefined ? updates.altText : slot.altText;
+
       const newDraftImageUrl = updates.draftImageUrl !== undefined ? updates.draftImageUrl : slot.draftImageUrl;
       const newDraftAltText = updates.draftAltText !== undefined ? updates.draftAltText : slot.draftAltText;
-      const newDraftAspect = updates.draftAspectRatio !== undefined ? updates.draftAspectRatio : slot.draftAspectRatio;
-      const newDraftFit = updates.draftFit !== undefined ? updates.draftFit : slot.draftFit;
-      const newDraftPosition = updates.draftPosition !== undefined ? updates.draftPosition : slot.draftPosition;
       const newDraftTitle = updates.draftTitle !== undefined ? updates.draftTitle : slot.draftTitle;
       const newDraftSubtitle = updates.draftSubtitle !== undefined ? updates.draftSubtitle : slot.draftSubtitle;
       const newDraftText = updates.draftText !== undefined ? updates.draftText : slot.draftText;
@@ -390,11 +451,11 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const newDraftCtaLink = updates.draftCtaLink !== undefined ? updates.draftCtaLink : slot.draftCtaLink;
 
       const hasChanges =
-        (newDraftImageUrl !== undefined && newDraftImageUrl !== slot.imageUrl) ||
-        (newDraftAltText !== undefined && newDraftAltText !== slot.altText) ||
-        (newDraftAspect !== undefined && newDraftAspect !== slot.aspectRatio) ||
-        (newDraftFit !== undefined && newDraftFit !== slot.fit) ||
-        (newDraftPosition !== undefined && newDraftPosition !== slot.position) ||
+        (newDraftImageUrl !== undefined && newDraftImageUrl !== newImageUrl) ||
+        (newDraftAltText !== undefined && newDraftAltText !== newAltText) ||
+        (newDraftAspect !== undefined && newDraftAspect !== newAspect) ||
+        (newDraftFit !== undefined && newDraftFit !== newFit) ||
+        (newDraftPosition !== undefined && newDraftPosition !== newPosition) ||
         (newDraftTitle !== undefined && newDraftTitle !== (slot.title || '')) ||
         (newDraftSubtitle !== undefined && newDraftSubtitle !== (slot.subtitle || '')) ||
         (newDraftText !== undefined && newDraftText !== (slot.text || '')) ||
@@ -403,11 +464,16 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
       return {
         ...slot,
+        aspectRatio: newAspect,
+        draftAspectRatio: newDraftAspect,
+        fit: newFit,
+        draftFit: newDraftFit,
+        position: newPosition,
+        draftPosition: newDraftPosition,
+        imageUrl: newImageUrl,
+        altText: newAltText,
         draftImageUrl: newDraftImageUrl,
         draftAltText: newDraftAltText,
-        draftAspectRatio: newDraftAspect,
-        draftFit: newDraftFit,
-        draftPosition: newDraftPosition,
         draftTitle: newDraftTitle,
         draftSubtitle: newDraftSubtitle,
         draftText: newDraftText,

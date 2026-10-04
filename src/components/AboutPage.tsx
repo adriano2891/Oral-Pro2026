@@ -2,7 +2,7 @@ import React from 'react';
 import { ShieldCheck, ChevronRight } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useSiteContent } from '../context/SiteContentContext';
-import { PageView } from '../types';
+import { PageView, getAspectRatioClass, getImageFitClass, getImagePositionClass } from '../types';
 import { InstagramGallerySection } from './InstagramGallerySection';
 
 interface AboutPageProps {
@@ -79,21 +79,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onOpenBooking, onNavigate 
               <img
                 src={founderSlot.imageUrl}
                 alt={founderSlot.altText}
-                className={`w-full ${
-                  founderSlot.aspectRatio === '1:1'
-                    ? 'aspect-square'
-                    : founderSlot.aspectRatio === '4:3'
-                    ? 'aspect-[4/3]'
-                    : founderSlot.aspectRatio === '16:9'
-                    ? 'aspect-[16/9]'
-                    : 'aspect-[16/10]'
-                } ${founderSlot.fit === 'contain' ? 'object-contain' : 'object-cover'} ${
-                  founderSlot.position === 'top'
-                    ? 'object-top'
-                    : founderSlot.position === 'bottom'
-                    ? 'object-bottom'
-                    : 'object-center'
-                }`}
+                className={`w-full ${getAspectRatioClass(founderSlot.aspectRatio)} ${getImageFitClass(founderSlot.fit)} ${getImagePositionClass(founderSlot.position)}`}
                 referrerPolicy="no-referrer"
               />
               <div className="p-4 bg-white border-t border-slate-100 flex items-center justify-between text-xs">
@@ -106,21 +92,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onOpenBooking, onNavigate 
               <img
                 src={masterclassSlot.imageUrl}
                 alt={masterclassSlot.altText}
-                className={`w-full ${
-                  masterclassSlot.aspectRatio === '1:1'
-                    ? 'aspect-square'
-                    : masterclassSlot.aspectRatio === '4:3'
-                    ? 'aspect-[4/3]'
-                    : masterclassSlot.aspectRatio === '16:10'
-                    ? 'aspect-[16/10]'
-                    : 'aspect-[16/9]'
-                } ${masterclassSlot.fit === 'contain' ? 'object-contain' : 'object-cover'} ${
-                  masterclassSlot.position === 'top'
-                    ? 'object-top'
-                    : masterclassSlot.position === 'bottom'
-                    ? 'object-bottom'
-                    : 'object-center'
-                }`}
+                className={`w-full ${getAspectRatioClass(masterclassSlot.aspectRatio)} ${getImageFitClass(masterclassSlot.fit)} ${getImagePositionClass(masterclassSlot.position)}`}
                 referrerPolicy="no-referrer"
               />
               <div className="p-4 bg-white border-t border-slate-100 flex items-center justify-between text-xs">

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Instagram, ExternalLink, ShieldCheck, ZoomIn, X, Camera, Sparkles } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useSiteContent } from '../context/SiteContentContext';
+import { getAspectRatioClass, getImageFitClass, getImagePositionClass } from '../types';
 
 export interface GalleryPhoto {
   id: string;
@@ -98,6 +99,9 @@ export const InstagramGallerySection: React.FC = () => {
       ...photo,
       imageUrl: slot.imageUrl || photo.imageUrl,
       alt: slot.altText || photo.alt,
+      aspectRatio: slot.aspectRatio,
+      fit: slot.fit,
+      position: slot.position,
     };
   });
 
@@ -186,12 +190,12 @@ export const InstagramGallerySection: React.FC = () => {
               className="group bg-slate-800/60 rounded-2xl overflow-hidden border border-slate-700/60 hover:border-blue-500/50 transition-all duration-300 flex flex-col cursor-pointer shadow-lg hover:shadow-xl"
             >
               {/* Image Frame */}
-              <div className="relative overflow-hidden bg-slate-950 aspect-[16/10]">
+              <div className={`relative overflow-hidden bg-slate-950 ${getAspectRatioClass((photo as any).aspectRatio || '16:10')}`}>
                 <img
                   src={photo.imageUrl}
                   alt={photo.alt}
                   loading="lazy"
-                  className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                  className={`w-full h-full ${getImageFitClass((photo as any).fit)} ${getImagePositionClass((photo as any).position)} group-hover:scale-105 transition-transform duration-500`}
                   referrerPolicy="no-referrer"
                 />
                 
@@ -287,11 +291,11 @@ export const InstagramGallerySection: React.FC = () => {
               <X className="w-5 h-5" />
             </button>
 
-            <div className="relative aspect-[16/10] bg-black">
+            <div className={`relative ${getAspectRatioClass((activePhoto as any).aspectRatio || '16:10')} bg-black max-h-[70vh] flex items-center justify-center`}>
               <img
                 src={activePhoto.imageUrl}
                 alt={activePhoto.alt}
-                className="w-full h-full object-cover"
+                className={`max-w-full max-h-[70vh] ${getImageFitClass((activePhoto as any).fit)} ${getImagePositionClass((activePhoto as any).position)}`}
               />
             </div>
 

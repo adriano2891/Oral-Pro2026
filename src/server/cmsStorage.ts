@@ -448,8 +448,16 @@ export const cmsStorage = {
     if (updates.draftImageUrl !== undefined) slot.draftImageUrl = updates.draftImageUrl;
     if (updates.draftAltText !== undefined) slot.draftAltText = updates.draftAltText;
     if (updates.draftAspectRatio !== undefined) slot.draftAspectRatio = updates.draftAspectRatio;
+    if (updates.aspectRatio !== undefined) slot.aspectRatio = updates.aspectRatio;
+    else if (updates.draftAspectRatio !== undefined) slot.aspectRatio = updates.draftAspectRatio;
     if (updates.draftFit !== undefined) slot.draftFit = updates.draftFit;
+    if (updates.fit !== undefined) slot.fit = updates.fit;
+    else if (updates.draftFit !== undefined) slot.fit = updates.draftFit;
     if (updates.draftPosition !== undefined) slot.draftPosition = updates.draftPosition;
+    if (updates.position !== undefined) slot.position = updates.position;
+    else if (updates.draftPosition !== undefined) slot.position = updates.draftPosition;
+    if (updates.imageUrl !== undefined) slot.imageUrl = updates.imageUrl;
+    if (updates.altText !== undefined) slot.altText = updates.altText;
     if (updates.draftTitle !== undefined) slot.draftTitle = updates.draftTitle;
     if (updates.draftSubtitle !== undefined) slot.draftSubtitle = updates.draftSubtitle;
     if (updates.draftText !== undefined) slot.draftText = updates.draftText;

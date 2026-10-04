@@ -1,5 +1,5 @@
 import React from 'react';
-import { CustomSection } from '../types';
+import { CustomSection, getAspectRatioClass, getImageFitClass, getImagePositionClass } from '../types';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
 
 interface DynamicCustomSectionsProps {
@@ -79,22 +79,9 @@ export const DynamicCustomSections: React.FC<DynamicCustomSectionsProps> = ({
               {hasImages && (
                 <div className={`lg:col-span-6 ${isMultiImage ? 'grid grid-cols-2 gap-4' : ''}`}>
                   {section.images.map((img, idx) => {
-                    const aspectClass =
-                      img.aspectRatio === '1:1'
-                        ? 'aspect-square'
-                        : img.aspectRatio === '4:3'
-                        ? 'aspect-[4/3]'
-                        : img.aspectRatio === '16:10'
-                        ? 'aspect-[16/10]'
-                        : 'aspect-[16/9]';
-
-                    const fitClass = img.fit === 'contain' ? 'object-contain' : 'object-cover';
-                    const posClass =
-                      img.position === 'top'
-                        ? 'object-top'
-                        : img.position === 'bottom'
-                        ? 'object-bottom'
-                        : 'object-center';
+                    const aspectClass = getAspectRatioClass(img.aspectRatio);
+                    const fitClass = getImageFitClass(img.fit);
+                    const posClass = getImagePositionClass(img.position);
 
                     return (
                       <div

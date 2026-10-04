@@ -25,7 +25,7 @@ export const OralProLogo: React.FC<LogoProps> = ({
     xs: 'h-6 sm:h-7 max-w-[130px]',
     sm: 'h-7 sm:h-8 max-w-[160px]',
     md: 'h-8.5 sm:h-9.5 lg:h-10.5 max-w-[200px]',
-    header: 'h-9 sm:h-10.5 lg:h-12 xl:h-13 max-w-[190px] sm:max-w-[220px] lg:max-w-[260px]',
+    header: 'h-8 sm:h-9.5 lg:h-11 xl:h-12 max-w-[160px] sm:max-w-[200px] lg:max-w-[240px]',
     lg: 'h-11 sm:h-13 lg:h-15 max-w-[300px]',
     xl: 'h-15 sm:h-18 lg:h-22 max-w-[380px]',
   }[size] || 'h-9 sm:h-10.5 lg:h-12 xl:h-13 max-w-[190px] sm:max-w-[220px] lg:max-w-[260px]';

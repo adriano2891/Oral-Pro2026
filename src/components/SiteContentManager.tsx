@@ -30,7 +30,7 @@ import {
   Info,
 } from 'lucide-react';
 import { useSiteContent } from '../context/SiteContentContext';
-import { SiteContentSlot, CustomSection, CustomSectionImage, MediaLibraryItem } from '../types';
+import { SiteContentSlot, CustomSection, CustomSectionImage, MediaLibraryItem, getAspectRatioClass, getImageFitClass, getImagePositionClass } from '../types';
 
 // Client-side resilient image compression utility
 async function compressImageFile(file: File): Promise<{ dataUrl: string; sizeKb: number; width: number; height: number }> {
@@ -302,19 +302,40 @@ export const SiteContentManager: React.FC<SiteContentManagerProps> = ({
     }
   };
 
-  // 4. Slots Field Change
+  // 4. Slots Field Change - ensures aspect ratio, framing, and position are fixed and saved immediately
   const handleSlotFieldChange = async (
     key: string,
     field: 'draftAspectRatio' | 'draftFit' | 'draftPosition' | 'draftAltText' | 'draftImageUrl',
     value: any
   ) => {
-    const success = await updateSlot(key, { [field]: value });
+    const updates: Partial<SiteContentSlot> = { [field]: value };
+    if (field === 'draftAspectRatio') {
+      updates.aspectRatio = value;
+      updates.draftAspectRatio = value;
+    } else if (field === 'draftFit') {
+      updates.fit = value;
+      updates.draftFit = value;
+    } else if (field === 'draftPosition') {
+      updates.position = value;
+      updates.draftPosition = value;
+    }
+
+    const success = await updateSlot(key, updates);
     if (success) {
       // Clear broken state if new image url was provided
       if (field === 'draftImageUrl') {
         setBrokenImages((prev) => ({ ...prev, [key]: false }));
       }
-      showNotification('info', 'Rascunho atualizado. Clique em "Publicar alterações" para aplicar ao site público.');
+      showNotification(
+        'success',
+        field === 'draftAspectRatio'
+          ? `Proporção (${value}) fixada e guardada com sucesso!`
+          : field === 'draftFit'
+          ? `Enquadramento (${value}) fixado e guardado!`
+          : field === 'draftPosition'
+          ? `Posição focal (${value}) fixada e guardada!`
+          : 'Alteração guardada com sucesso!'
+      );
     } else {
       showNotification('error', 'Erro ao atualizar campo.');
     }
@@ -1882,27 +1903,7 @@ export const SiteContentManager: React.FC<SiteContentManagerProps> = ({
                           ? previewModalSlot.draftAltText
                           : previewModalSlot.altText
                       }
-                      className={`w-full ${
-                        (previewModalSlot.draftAspectRatio || previewModalSlot.aspectRatio) === '1:1'
-                          ? 'aspect-square'
-                          : (previewModalSlot.draftAspectRatio || previewModalSlot.aspectRatio) === '4:3'
-                          ? 'aspect-[4/3]'
-                          : (previewModalSlot.draftAspectRatio || previewModalSlot.aspectRatio) === '16:10'
-                          ? 'aspect-[16/10]'
-                          : (previewModalSlot.draftAspectRatio || previewModalSlot.aspectRatio) === '3:2'
-                          ? 'aspect-[3/2]'
-                          : 'aspect-[16/9]'
-                      } ${
-                        (previewModalSlot.draftFit || previewModalSlot.fit) === 'contain'
-                          ? 'object-contain'
-                          : 'object-cover'
-                      } ${
-                        (previewModalSlot.draftPosition || previewModalSlot.position) === 'top'
-                          ? 'object-top'
-                          : (previewModalSlot.draftPosition || previewModalSlot.position) === 'bottom'
-                          ? 'object-bottom'
-                          : 'object-center'
-                      }`}
+                      className={`w-full ${getAspectRatioClass(previewModalSlot.draftAspectRatio || previewModalSlot.aspectRatio)} ${getImageFitClass(previewModalSlot.draftFit || previewModalSlot.fit)} ${getImagePositionClass(previewModalSlot.draftPosition || previewModalSlot.position)}`}
                     />
                   </div>
 
@@ -2061,28 +2062,12 @@ export const SiteContentManager: React.FC<SiteContentManagerProps> = ({
 
                             {img ? (
                               <div
-                                className={`rounded-xl overflow-hidden bg-slate-200 ${
-                                  aspect === '1:1'
-                                    ? 'aspect-square'
-                                    : aspect === '4:3'
-                                    ? 'aspect-[4/3]'
-                                    : aspect === '16:10'
-                                    ? 'aspect-[16/10]'
-                                    : 'aspect-[16/9]'
-                                }`}
+                                className={`rounded-xl overflow-hidden bg-slate-200 ${getAspectRatioClass(aspect)}`}
                               >
                                 <img
                                   src={img}
                                   alt={alt}
-                                  className={`w-full h-full ${
-                                    fit === 'contain' ? 'object-contain' : 'object-cover'
-                                  } ${
-                                    pos === 'top'
-                                      ? 'object-top'
-                                      : pos === 'bottom'
-                                      ? 'object-bottom'
-                                      : 'object-center'
-                                  }`}
+                                  className={`w-full h-full ${getImageFitClass(fit)} ${getImagePositionClass(pos)}`}
                                 />
                               </div>
                             ) : (
@@ -2303,10 +2288,12 @@ export const SiteContentManager: React.FC<SiteContentManagerProps> = ({
                             }}
                             className="w-full px-2 py-1 bg-white rounded-lg border border-slate-200 text-xs"
                           >
-                            <option value="16:9">16:9</option>
-                            <option value="16:10">16:10</option>
-                            <option value="4:3">4:3</option>
-                            <option value="1:1">1:1</option>
+                            <option value="16:9">16:9 (Panorâmica)</option>
+                            <option value="16:10">16:10 (Ecrã)</option>
+                            <option value="4:3">4:3 (Clínica)</option>
+                            <option value="1:1">1:1 (Quadrada)</option>
+                            <option value="3:2">3:2 (Fotografia)</option>
+                            <option value="auto">Auto (Natural)</option>
                           </select>
                         </div>
 

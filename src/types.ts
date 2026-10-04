@@ -153,3 +153,31 @@ export type PageView =
   | 'admin';
 
 export type Language = 'pt' | 'it' | 'en';
+
+export function getAspectRatioClass(aspectRatio?: string): string {
+  switch (aspectRatio) {
+    case '1:1':
+      return 'aspect-square';
+    case '4:3':
+      return 'aspect-[4/3]';
+    case '16:10':
+      return 'aspect-[16/10]';
+    case '3:2':
+      return 'aspect-[3/2]';
+    case 'auto':
+      return 'aspect-auto min-h-[140px]';
+    case '16:9':
+    default:
+      return 'aspect-[16/9]';
+  }
+}
+
+export function getImageFitClass(fit?: 'cover' | 'contain' | string): string {
+  return fit === 'contain' ? 'object-contain' : 'object-cover';
+}
+
+export function getImagePositionClass(pos?: 'center' | 'top' | 'bottom' | string): string {
+  if (pos === 'top') return 'object-top';
+  if (pos === 'bottom') return 'object-bottom';
+  return 'object-center';
+}

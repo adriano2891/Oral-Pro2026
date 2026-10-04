@@ -2,7 +2,7 @@ import React from 'react';
 import { ShieldCheck, ExternalLink, ArrowRight } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useSiteContent } from '../context/SiteContentContext';
-import { PageView } from '../types';
+import { PageView, getAspectRatioClass, getImageFitClass, getImagePositionClass } from '../types';
 
 interface AboutSectionProps {
   onOpenBooking: () => void;
@@ -29,21 +29,7 @@ export const AboutSection: React.FC<AboutSectionProps> = ({ onOpenBooking, onNav
               <img
                 src={aboutSlot.imageUrl}
                 alt={aboutSlot.altText}
-                className={`w-full ${
-                  aboutSlot.aspectRatio === '1:1'
-                    ? 'aspect-square'
-                    : aboutSlot.aspectRatio === '4:3'
-                    ? 'aspect-[4/3]'
-                    : aboutSlot.aspectRatio === '16:9'
-                    ? 'aspect-[16/9]'
-                    : 'aspect-[16/10]'
-                } ${aboutSlot.fit === 'contain' ? 'object-contain' : 'object-cover'} ${
-                  aboutSlot.position === 'top'
-                    ? 'object-top'
-                    : aboutSlot.position === 'bottom'
-                    ? 'object-bottom'
-                    : 'object-center'
-                }`}
+                className={`w-full ${getAspectRatioClass(aboutSlot.aspectRatio)} ${getImageFitClass(aboutSlot.fit)} ${getImagePositionClass(aboutSlot.position)}`}
                 referrerPolicy="no-referrer"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />

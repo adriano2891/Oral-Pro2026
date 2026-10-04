@@ -2,7 +2,7 @@ import React from 'react';
 import { Target, Users, BarChart3, CheckCircle2, Calendar, ChevronRight } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useSiteContent } from '../context/SiteContentContext';
-import { PageView } from '../types';
+import { PageView, getAspectRatioClass, getImageFitClass, getImagePositionClass } from '../types';
 
 interface ServicesPageProps {
   onOpenBooking: () => void;
@@ -105,19 +105,7 @@ export const ServicesPage: React.FC<ServicesPageProps> = ({ onOpenBooking, onOpe
                             <img
                               src={slot.imageUrl}
                               alt={slot.altText || service.title}
-                              className={`w-full ${
-                                slot.aspectRatio === '1:1'
-                                  ? 'aspect-square'
-                                  : slot.aspectRatio === '16:9'
-                                  ? 'aspect-[16/9]'
-                                  : 'aspect-[4/3]'
-                              } ${slot.fit === 'contain' ? 'object-contain' : 'object-cover'} ${
-                                slot.position === 'top'
-                                  ? 'object-top'
-                                  : slot.position === 'bottom'
-                                  ? 'object-bottom'
-                                  : 'object-center'
-                              }`}
+                              className={`w-full ${getAspectRatioClass(slot.aspectRatio)} ${getImageFitClass(slot.fit)} ${getImagePositionClass(slot.position)}`}
                               referrerPolicy="no-referrer"
                             />
                           </div>

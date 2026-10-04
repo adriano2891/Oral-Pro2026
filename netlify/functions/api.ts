@@ -128,6 +128,11 @@ export const handler = async (event: any) => {
       const current = serverState.slots[slotIndex];
       serverState.slots[slotIndex] = {
         ...current,
+        aspectRatio: updates.aspectRatio !== undefined ? updates.aspectRatio : (updates.draftAspectRatio !== undefined ? updates.draftAspectRatio : current.aspectRatio),
+        fit: updates.fit !== undefined ? updates.fit : (updates.draftFit !== undefined ? updates.draftFit : current.fit),
+        position: updates.position !== undefined ? updates.position : (updates.draftPosition !== undefined ? updates.draftPosition : current.position),
+        imageUrl: updates.imageUrl !== undefined ? updates.imageUrl : current.imageUrl,
+        altText: updates.altText !== undefined ? updates.altText : current.altText,
         draftImageUrl: updates.draftImageUrl !== undefined ? updates.draftImageUrl : current.draftImageUrl,
         draftAltText: updates.draftAltText !== undefined ? updates.draftAltText : current.draftAltText,
         draftAspectRatio: updates.draftAspectRatio !== undefined ? updates.draftAspectRatio : current.draftAspectRatio,

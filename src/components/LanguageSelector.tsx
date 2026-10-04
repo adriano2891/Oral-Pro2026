@@ -41,60 +41,41 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
     }
   }, [dropdownOpen]);
 
-  // Mobile drawer variant: full-width trigger matching reference Image 2
+  // Mobile drawer variant: displays all language options cleanly and directly
   if (variant === 'mobile') {
     return (
-      <div ref={containerRef} className={`relative w-full ${className}`}>
-        <button
-          type="button"
-          onClick={() => setDropdownOpen(!dropdownOpen)}
-          aria-expanded={dropdownOpen}
-          aria-haspopup="listbox"
-          aria-label="Selecionar idioma"
-          className="w-full flex items-center justify-between px-4 py-3 bg-slate-100 hover:bg-slate-200/80 active:bg-slate-200 text-slate-800 rounded-xl text-sm font-semibold transition-all cursor-pointer border border-slate-200/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-        >
-          <div className="flex items-center gap-2.5">
-            <Globe className="w-4 h-4 text-slate-600 shrink-0" />
-            <span className="text-slate-800">{currentLang.name}</span>
-          </div>
-          <ChevronDown
-            className={`w-4 h-4 text-slate-500 transition-transform duration-200 ${
-              dropdownOpen ? 'rotate-180' : ''
-            }`}
-          />
-        </button>
-
-        {dropdownOpen && (
-          <div
-            role="listbox"
-            className="mt-2 w-full bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150"
-          >
-            {availableLanguages.map((lang) => {
-              const isSelected = language === lang.code;
-              return (
-                <button
-                  key={lang.code}
-                  role="option"
-                  aria-selected={isSelected}
-                  onClick={() => {
-                    setLanguage(lang.code);
-                    setDropdownOpen(false);
-                  }}
-                  className={`w-full text-left px-4 py-2.5 text-sm font-medium flex items-center justify-between transition-colors cursor-pointer ${
-                    isSelected
-                      ? 'bg-blue-50 text-blue-700 font-bold'
-                      : 'text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span>{lang.name}</span>
-                  </div>
-                  {isSelected && <Check className="w-4 h-4 text-blue-600" />}
-                </button>
-              );
-            })}
-          </div>
-        )}
+      <div className={`w-full space-y-2 ${className}`}>
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+          <Globe className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+          <span>Idioma / Language / Lingua</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {availableLanguages.map((lang) => {
+            const isSelected = language === lang.code;
+            return (
+              <button
+                key={lang.code}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                onClick={() => setLanguage(lang.code)}
+                className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 border cursor-pointer ${
+                  isSelected
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                }`}
+              >
+                <div className="flex items-center gap-1">
+                  <span className="uppercase text-[11px] font-extrabold tracking-wider">{lang.code}</span>
+                  {isSelected && <Check className="w-3.5 h-3.5 text-white shrink-0" />}
+                </div>
+                <span className={`text-[10px] truncate ${isSelected ? 'text-blue-100' : 'text-slate-500'}`}>
+                  {lang.name}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     );
   }
