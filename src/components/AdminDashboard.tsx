@@ -767,7 +767,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToSite }) 
       <header className="bg-slate-950 text-white fixed top-0 left-0 right-0 z-40 border-b border-slate-800 shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 shrink-0">
-            <OralProLogo size="header" light />
+            <button
+              type="button"
+              onClick={onBackToSite}
+              className="group text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-xl transition-opacity hover:opacity-90 cursor-pointer flex items-center shrink-0"
+              aria-label="OralPro - Voltar à Página Inicial"
+              title="Voltar à Página Inicial"
+            >
+              <OralProLogo size="sm" light />
+            </button>
             <span className="hidden sm:inline-block h-5 w-px bg-slate-800" />
             <div className="hidden sm:flex items-center gap-2 text-xs">
               <span className="px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-400 font-bold border border-blue-500/30">

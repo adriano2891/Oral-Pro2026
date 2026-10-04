@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 export const ORALPRO_LOGO_URL = '/images/oralpro-logo.png';
-export const ORALPRO_REMOTE_LOGO_URL = 'https://i.ibb.co/MDpzrTVH/chatgpt-7.png';
+export const ORALPRO_REMOTE_LOGO_URL = 'https://i.ibb.co/zW4LH4ZY/Design-sem-nome.png';
 
 export interface LogoProps {
   className?: string;
@@ -20,14 +20,15 @@ export const OralProLogo: React.FC<LogoProps> = ({
   const [imgSrc, setImgSrc] = useState(ORALPRO_LOGO_URL);
 
   // Height configurations tuned for optimal horizontal balance with pure transparent background
+  // The logo has natural ~3.47:1 proportion (1021x294), ensuring crisp sharpness across all devices.
   const heightClass = {
-    xs: 'h-6 sm:h-7',
-    sm: 'h-8 sm:h-9',
-    md: 'h-10 sm:h-11 lg:h-12',
-    header: 'h-9 sm:h-10.5 lg:h-12.5 xl:h-14',
-    lg: 'h-13 sm:h-15 lg:h-18',
-    xl: 'h-18 sm:h-22 lg:h-26',
-  }[size] || 'h-9 sm:h-10.5 lg:h-12.5 xl:h-14';
+    xs: 'h-6 sm:h-7 max-w-[130px]',
+    sm: 'h-7 sm:h-8 max-w-[160px]',
+    md: 'h-8.5 sm:h-9.5 lg:h-10.5 max-w-[200px]',
+    header: 'h-9 sm:h-10.5 lg:h-12 xl:h-13 max-w-[190px] sm:max-w-[220px] lg:max-w-[260px]',
+    lg: 'h-11 sm:h-13 lg:h-15 max-w-[300px]',
+    xl: 'h-15 sm:h-18 lg:h-22 max-w-[380px]',
+  }[size] || 'h-9 sm:h-10.5 lg:h-12 xl:h-13 max-w-[190px] sm:max-w-[220px] lg:max-w-[260px]';
 
   const logoImage = (
     <img
@@ -45,17 +46,18 @@ export const OralProLogo: React.FC<LogoProps> = ({
   );
 
   // If used on a dark background (light = true), provide a crisp white badge for legibility
+  // matching the dark header specification while preserving transparent PNG rendering
   if (light || showBackground) {
     return (
       <div
-        className={`inline-flex items-center justify-center bg-white px-2.5 py-1 rounded-xl shadow-xs border border-white/20 select-none shrink-0 ${className}`}
+        className={`inline-flex items-center justify-center bg-white px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl shadow-xs border border-white/20 select-none shrink-0 ${className}`}
       >
         {logoImage}
       </div>
     );
   }
 
-  // Pure transparent background (e.g. Navbar)
+  // Pure transparent background (e.g. Navbar on public site)
   return (
     <div className={`inline-flex items-center shrink-0 select-none bg-transparent ${className}`}>
       {logoImage}
@@ -85,5 +87,3 @@ export const OralProEmblem: React.FC<EmblemProps> = ({
     />
   );
 };
-
-
