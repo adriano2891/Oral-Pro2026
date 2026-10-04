@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSiteContent } from '../context/SiteContentContext';
 
-export const ORALPRO_LOGO_URL = '/images/oralpro-logo.png';
-export const ORALPRO_REMOTE_LOGO_URL = 'https://i.ibb.co/zW4LH4ZY/Design-sem-nome.png';
+export const ORALPRO_LOGO_URL = 'https://i.ibb.co/vx8MfgHj/Design-sem-nome-1-1.png';
+export const ORALPRO_REMOTE_LOGO_URL = 'https://i.ibb.co/vx8MfgHj/Design-sem-nome-1-1.png';
+export const ORALPRO_LOCAL_LOGO_URL = '/images/oralpro-logo.png';
 
 export interface LogoProps {
   className?: string;
@@ -17,18 +19,36 @@ export const OralProLogo: React.FC<LogoProps> = ({
   light = false,
   showBackground = false,
 }) => {
-  const [imgSrc, setImgSrc] = useState(ORALPRO_LOGO_URL);
+  // Support dynamic logo slot from CMS if mounted inside SiteContentProvider
+  let dynamicLogoUrl: string | undefined;
+  try {
+    const siteContent = useSiteContent();
+    const logoSlot = siteContent?.getSlot('header_logo', ORALPRO_REMOTE_LOGO_URL);
+    if (logoSlot?.imageUrl) {
+      dynamicLogoUrl = logoSlot.imageUrl;
+    }
+  } catch {
+    // Rendered outside SiteContentProvider (e.g. isolated test or error boundary)
+  }
 
-  // Height configurations tuned for optimal horizontal balance with pure transparent background
-  // The logo has natural ~3.47:1 proportion (1021x294), ensuring crisp sharpness across all devices.
+  const activeUrl = dynamicLogoUrl || ORALPRO_REMOTE_LOGO_URL;
+  const [imgSrc, setImgSrc] = useState(activeUrl);
+
+  useEffect(() => {
+    if (dynamicLogoUrl && dynamicLogoUrl !== imgSrc) {
+      setImgSrc(dynamicLogoUrl);
+    }
+  }, [dynamicLogoUrl]);
+
+  // Height configurations tuned for optimal balance across all screen sizes
   const heightClass = {
-    xs: 'h-6 sm:h-7 max-w-[130px]',
-    sm: 'h-7 sm:h-8 max-w-[160px]',
-    md: 'h-8.5 sm:h-9.5 lg:h-10.5 max-w-[200px]',
-    header: 'h-8 sm:h-9.5 lg:h-11 xl:h-12 max-w-[160px] sm:max-w-[200px] lg:max-w-[240px]',
-    lg: 'h-11 sm:h-13 lg:h-15 max-w-[300px]',
-    xl: 'h-15 sm:h-18 lg:h-22 max-w-[380px]',
-  }[size] || 'h-9 sm:h-10.5 lg:h-12 xl:h-13 max-w-[190px] sm:max-w-[220px] lg:max-w-[260px]';
+    xs: 'h-7 sm:h-8 max-w-[130px]',
+    sm: 'h-8 sm:h-9 max-w-[150px]',
+    md: 'h-9 sm:h-11 max-w-[180px]',
+    header: 'h-11 sm:h-13 lg:h-15 max-w-[170px] sm:max-w-[210px] lg:max-w-[250px]',
+    lg: 'h-13 sm:h-15 lg:h-17 max-w-[280px]',
+    xl: 'h-16 sm:h-20 lg:h-24 max-w-[340px]',
+  }[size] || 'h-11 sm:h-13 lg:h-15 max-w-[210px]';
 
   const logoImage = (
     <img
@@ -36,8 +56,8 @@ export const OralProLogo: React.FC<LogoProps> = ({
       alt="OralPro - Marketing Dentário"
       className={`${heightClass} w-auto object-contain select-none transition-transform duration-200 group-hover:scale-[1.02] shrink-0 bg-transparent`}
       onError={() => {
-        if (imgSrc !== ORALPRO_REMOTE_LOGO_URL) {
-          setImgSrc(ORALPRO_REMOTE_LOGO_URL);
+        if (imgSrc !== ORALPRO_LOCAL_LOGO_URL) {
+          setImgSrc(ORALPRO_LOCAL_LOGO_URL);
         }
       }}
       loading="eager"
@@ -46,7 +66,6 @@ export const OralProLogo: React.FC<LogoProps> = ({
   );
 
   // If used on a dark background (light = true), provide a crisp white badge for legibility
-  // matching the dark header specification while preserving transparent PNG rendering
   if (light || showBackground) {
     return (
       <div

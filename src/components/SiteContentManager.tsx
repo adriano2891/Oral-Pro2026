@@ -1468,6 +1468,7 @@ export const SiteContentManager: React.FC<SiteContentManagerProps> = ({
                     onChange={(e) => setNewImageSection(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
+                    <option value="Cabeçalho">Cabeçalho & Logótipo</option>
                     <option value="Hero">Hero</option>
                     <option value="Apresentação">Apresentação</option>
                     <option value="Sobre">Sobre a OralPro</option>

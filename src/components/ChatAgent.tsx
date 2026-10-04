@@ -4,7 +4,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { Language } from '../types';
 import { OralProEmblem } from './OralProLogo';
 
-export const AGENT_AVATAR_SRC = 'https://i.ibb.co/fV5RTsz1/chatgpt-4.png';
+export const AGENT_AVATAR_SRC = 'https://i.ibb.co/vx8MfgHj/Design-sem-nome-1-1.png';
 export const AGENT_AVATAR_FALLBACK = '/images/agent-avatar.png';
 
 export const AgentAvatarImage: React.FC<{ className?: string; alt?: string }> = ({
@@ -289,8 +289,8 @@ export const ChatAgent: React.FC<ChatAgentProps> = ({ isOpen, onToggle, onOpenBo
             </span>
           </div>
 
-          {/* Tooth Silhouette Shape Card filled professionally with the Provided Image */}
-          <div className="relative w-13 h-14 sm:w-14 sm:h-15 flex items-center justify-center shrink-0 animate-gentle-pulse bg-transparent border-0 shadow-none">
+          {/* Virtual Agent Icon Button */}
+          <div className="relative w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center shrink-0 animate-gentle-pulse bg-transparent border-0 shadow-none">
             <div className="relative w-full h-full flex items-center justify-center">
               <img
                 src={AGENT_AVATAR_SRC}

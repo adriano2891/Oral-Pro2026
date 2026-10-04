@@ -2,6 +2,19 @@ import { SiteContentSlot, CustomSection, MediaLibraryItem, AuditLogEntry } from 
 
 export const INITIAL_SLOTS: SiteContentSlot[] = [
   {
+    key: 'header_logo',
+    page: 'home',
+    pageLabel: 'Cabeçalho & Identidade',
+    sectionLabel: 'Logótipo Oficial do Cabeçalho e Rodapé',
+    description: 'Logótipo principal da OralPro visível no cabeçalho, menu móvel e rodapé',
+    imageUrl: 'https://i.ibb.co/vx8MfgHj/Design-sem-nome-1-1.png',
+    altText: 'OralPro - Marketing Dentário',
+    aspectRatio: 'auto',
+    fit: 'contain',
+    position: 'center',
+    hasChanges: false,
+  },
+  {
     key: 'home_hero',
     page: 'home',
     pageLabel: 'Página Inicial',
@@ -227,6 +240,17 @@ export const INITIAL_SLOTS: SiteContentSlot[] = [
 export const INITIAL_CUSTOM_SECTIONS: CustomSection[] = [];
 
 export const INITIAL_MEDIA_LIBRARY: MediaLibraryItem[] = [
+  {
+    id: 'lib-logo',
+    name: 'Logótipo Oficial OralPro',
+    url: 'https://i.ibb.co/vx8MfgHj/Design-sem-nome-1-1.png',
+    category: 'Logótipo & Marca',
+    aspectRatio: 'auto',
+    size: '334 KB',
+    origin: 'Identidade Visual',
+    createdAt: '2026-10-04T09:20:00Z',
+    usedIn: ['Cabeçalho (Navbar)', 'Menu Móvel', 'Rodapé', 'Painel Administrativo'],
+  },
   {
     id: 'lib-1',
     name: 'Mario Provenzano Apresentação',
